@@ -1,10 +1,13 @@
-import httplib
+try:
+    import httplib
+except ImportError:
+    import http.client as httplib
 
 import googleapiclient.errors
 import apiclient.http
 import httplib2
 
-import lib
+from . import lib
 
 RETRIABLE_EXCEPTIONS = [
     IOError, httplib2.HttpLib2Error, httplib.NotConnected,
@@ -17,14 +20,14 @@ def _upload_to_request(request, progress_callback):
     """Upload a video to a Youtube request. Return video ID."""
     while 1:
         status, response = request.next_chunk()
+        if status and progress_callback:
+            progress_callback(status.total_size, status.resumable_progress)
         if response:
             if "id" in response:
                 return response['id']
             else:
                 raise KeyError("Expected field 'id' not found in response")
-        elif status and progress_callback:
-            progress_callback(status.total_size, status.resumable_progress)
-        
+
 def upload(resource, path, body, chunksize=1024*1024, 
         progress_callback=None, max_retries=10):
     """Upload video to Youtube. Return video ID."""

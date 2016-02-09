@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import sys
 import locale
@@ -18,13 +19,16 @@ def default_sigint():
 def to_utf8(s):
     """Re-encode string from the default system encoding to UTF-8."""
     current = locale.getpreferredencoding()
-    return s.decode(current).encode("UTF-8") if s and current != "UTF-8" else s
-
+    if hasattr(s, 'decode'):#Python 3 workaround
+        return s.decode(current).encode("UTF-8") if s and current != "UTF-8" else s
+    else:
+        if isinstance(s, bytes):
+            s = bytes.decode(s)
+        return s
+       
 def debug(obj, fd=sys.stderr):
     """Write obj to standard error."""
-    string = str(obj.encode(get_encoding(fd), "backslashreplace")
-                 if isinstance(obj, unicode) else obj)
-    fd.write(string + "\n")
+    print(obj, file=fd)
 
 def catch_exceptions(exit_codes, fun, *args, **kwargs):
     """
@@ -35,7 +39,7 @@ def catch_exceptions(exit_codes, fun, *args, **kwargs):
         fun(*args, **kwargs)
         return 0
     except tuple(exit_codes.keys()) as exc:
-        debug("[%s] %s" % (exc.__class__.__name__, exc))
+        debug("[{0}] {1}".format(exc.__class__.__name__, exc))
         return exit_codes[exc.__class__]
 
 def get_encoding(fd):

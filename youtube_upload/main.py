@@ -19,15 +19,16 @@ import os
 import sys
 import optparse
 import collections
+import webbrowser
 
-import apiclient.errors
+import googleapiclient.errors
 import oauth2client
 
-import auth
-import upload_video
-import categories
-import lib
-import playlists
+from . import auth
+from . import upload_video
+from . import categories
+from . import lib
+from . import playlists
 
 # http://code.google.com/p/python-progressbar (>= 2.3)
 try:
@@ -54,21 +55,27 @@ WATCH_VIDEO_URL = "https://www.youtube.com/watch?v={id}"
 debug = lib.debug
 struct = collections.namedtuple
 
+def open_link(url):
+    """Opens a URL link in the client's browser."""
+    webbrowser.open(url)
+    
 def get_progress_info():
     """Return a function callback to update the progressbar."""
     progressinfo = struct("ProgressInfo", ["callback", "finish"])
 
     if progressbar:
-        widgets = [
+        bar = progressbar.ProgressBar(widgets=[
             progressbar.Percentage(), ' ',
             progressbar.Bar(), ' ',
             progressbar.ETA(), ' ',
             progressbar.FileTransferSpeed(),
-        ]
-        bar = progressbar.ProgressBar(widgets=widgets)
+        ])
         def _callback(total_size, completed):
             if not hasattr(bar, "next_update"):
-                bar.maxval = total_size
+                if hasattr(bar, "maxval"):
+                    bar.maxval = total_size
+                else:
+                    bar.max_value = total_size
                 bar.start()
             bar.update(completed)
         def _finish():
@@ -93,9 +100,15 @@ def upload_youtube_video(youtube, options, video_path, total_videos, index):
     """Upload video with index (for split videos)."""
     u = lib.to_utf8
     title = u(options.title)
-    description = u(options.description or "").decode("string-escape")
+    if hasattr(u('string'), 'decode'):   
+        description = u(options.description or "").decode("string-escape")
+    else:
+        description = options.description
+    if options.publish_at:    
+      debug("Your video will remain private until specified date.")
+      
     tags = [u(s.strip()) for s in (options.tags or "").split(",")]
-    ns = dict(title=u(title), n=index+1, total=total_videos)
+    ns = dict(title=title, n=index+1, total=total_videos)
     title_template = u(options.title_template)
     complete_title = (title_template.format(**ns) if total_videos > 1 else title)
     progress = get_progress_info()
@@ -106,14 +119,18 @@ def upload_youtube_video(youtube, options, video_path, total_videos, index):
             "description": description,
             "categoryId": category_id,
             "tags": tags,
+            "defaultLanguage": options.default_language,
+            "defaultAudioLanguage": options.default_audio_language,
+
         },
         "status": {
-            "privacyStatus": options.privacy,
-            "publishAt": options.publish-at,
+            "privacyStatus": ("private" if options.publish_at else options.privacy),
+            "publishAt": options.publish_at,
 
         },
         "recordingDetails": {
             "location": lib.string_to_dict(options.location),
+            "recordingDate": options.recording_date,
         },
     }
 
@@ -121,32 +138,12 @@ def upload_youtube_video(youtube, options, video_path, total_videos, index):
     try:
         video_id = upload_video.upload(youtube, video_path, 
             request_body, progress_callback=progress.callback)
-    except apiclient.errors.HttpError, error:
-        raise RequestError("Server response: {0}".format(error.content.strip()))
     finally:
         progress.finish()
     return video_id
 
-def parse_options_error(parser, options):
-    required_options = ["title"]
-    missing = [opt for opt in required_options if not getattr(options, opt)]
-    if missing:
-        parser.print_usage()
-        msg = "Some required option are missing: {0}".format(", ".join(missing))
-        raise OptionsError(msg)
-    scheduled = getattr(options, "publish-at") != None
-    if scheduled:
-        if getattr(options, "privacy") == "listed":
-            parser.print_usage()
-            msg = "The 'publish-at' option will publish your video for all audiences. It can not be used with '--privacy=listed'."
-            raise OptionsError(msg)
-        setattr(options, "privacy", "private")
-        debug("Your video will remain private until specified date.")
-
-def run_main(parser, options, args, output=sys.stdout):
-    """First check the passed options roughly for validity"""
-    parse_options_error(parser, options)
-    """Run the main scripts from the parsed options/args."""
+def get_youtube_handler(options):
+    """Return the API Youtube object."""
     home = os.path.expanduser("~")
     default_client_secrets = lib.get_first_existing_filename(
         [sys.prefix, os.path.join(sys.prefix, "local")],
@@ -159,21 +156,36 @@ def run_main(parser, options, args, output=sys.stdout):
     debug("Using credentials file: {0}".format(credentials))
     get_code_callback = (auth.browser.get_code 
         if options.auth_browser else auth.console.get_code)
-    youtube = auth.get_resource(client_secrets, credentials,
+    return auth.get_resource(client_secrets, credentials,
         get_code_callback=get_code_callback)
+
+def parse_options_error(parser, options):
+    """Check errors in options."""
+    required_options = ["title"]
+    missing = [opt for opt in required_options if not getattr(options, opt)]
+    if missing:
+        parser.print_usage()
+        msg = "Some required option are missing: {0}".format(", ".join(missing))
+        raise OptionsError(msg)
+
+def run_main(parser, options, args, output=sys.stdout):
+    """Run the main scripts from the parsed options/args."""
+    parse_options_error(parser, options)
+    youtube = get_youtube_handler(options)
 
     if youtube:
         for index, video_path in enumerate(args):
             video_id = upload_youtube_video(youtube, options, video_path, len(args), index)
             video_url = WATCH_VIDEO_URL.format(id=video_id)
-
+            debug("Video URL: {0}".format(video_url))
+            if options.open_link:
+                open_link(video_url) #Opens the Youtube Video's link in a webbrowser
+                
             if options.thumb:
                 youtube.thumbnails().set(videoId=video_id, media_body=options.thumb).execute()
-
             if options.playlist:
-                playlists.add_to_playlist(youtube, video_id, options)
-
-            debug("Video URL: {0}".format(video_url))
+                playlists.add_video_to_playlist(youtube, video_id, 
+                    title=lib.to_utf8(options.playlist), privacy=options.privacy)
             output.write(video_id + "\n")
     else:
         raise AuthenticationError("Cannot get youtube resource")
@@ -196,17 +208,25 @@ def main(arguments):
         help='Video tags (separated by commas: "tag1, tag2,...")')
     parser.add_option('', '--privacy', dest='privacy', metavar="STRING",
         default="public", help='Privacy status (public | unlisted | private)')
-    parser.add_option('', '--publish-at', dest='publish-at', metavar="datetime",
-       default=None, help='Publish Date: YYYY-MM-DDThh:mm:ss.sZ')
+    parser.add_option('', '--publish-at', dest='publish_at', metavar="datetime",
+       default=None, help='Publish date (ISO 8601): YYYY-MM-DDThh:mm:ss.sZ')
     parser.add_option('', '--location', dest='location', type="string",
         default=None, metavar="latitude=VAL,longitude=VAL[,altitude=VAL]",
         help='Video location"')
+    parser.add_option('', '--recording-date', dest='recording_date', metavar="datetime",
+        default=None, help="Recording date (ISO 8601): YYYY-MM-DDThh:mm:ss.sZ")
+    parser.add_option('', '--default-language', dest='default_language', type="string",
+        default=None, metavar="string", 
+        help="Default language (ISO 639-1: en | fr | de | ...)")
+    parser.add_option('', '--default-audio-language', dest='default_audio_language', type="string",
+        default=None, metavar="string", 
+        help="Default audio language (ISO 639-1: en | fr | de | ...)")
     parser.add_option('', '--thumbnail', dest='thumb', type="string",
         help='Video thumbnail')
     parser.add_option('', '--playlist', dest='playlist', type="string",
-        help='Playlist title (will create if necessary)')
+        help='Playlist title (if it does not exist, it will be created)')
     parser.add_option('', '--title-template', dest='title_template',
-        type="string", default="{title} [{n}/{total}]", metavar="STRING",
+        type="string", default="{title} [{n}/{total}]", metavar="string",
         help='Template for multiple videos (default: {title} [{n}/{total}])')
 
     # Authentication
@@ -214,11 +234,18 @@ def main(arguments):
         type="string", help='Client secrets JSON file')
     parser.add_option('', '--credentials-file', dest='credentials_file',
         type="string", help='Credentials JSON file')
-    parser.add_option('', '--auth-browser', dest='auth_browser', action="store_true",
+    parser.add_option('', '--auth-browser', dest='auth_browser', action='store_true',
         help='Open a GUI browser to authenticate if required')
 
+    #Additional options
+    parser.add_option('', '--open-link', dest='open_link', action='store_true',
+        help='Opens a url in a web browser to display the uploaded video')
+
     options, args = parser.parse_args(arguments)
-    run_main(parser, options, args)
+    try:
+        run_main(parser, options, args)
+    except googleapiclient.errors.HttpError as error:
+        raise RequestError("Server response: {0}".format(error.content.strip()))
 
 def run():
     sys.exit(lib.catch_exceptions(EXIT_CODES, main, sys.argv[1:]))

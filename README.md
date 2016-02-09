@@ -6,13 +6,13 @@ _Youtube-upload_ is a command line Python script that uploads videos to Youtube 
 Dependencies
 ============
 
-  * [Python 2.6 or 2.7](http://www.python.org). Python 3.0 is NOT supported.
-  * Packages: [google-api-python-client](https://developers.google.com/api-client-library/python), [progressbar](https://pypi.python.org/pypi/progressbar) (optional).
+  * [Python 2.6/2.7/3.x](http://www.python.org).
+  * Packages: [google-api-python-client](https://developers.google.com/api-client-library/python), [progressbar2](https://pypi.python.org/pypi/progressbar2) (optional).
 
-Check if your operating system provides those packages. If not, you can install them with `pip`:
+Check if your operating system provides those packages, otherwise install them with `pip`:
 
 ```
-$ pip install --upgrade google-api-python-client progressbar
+$ pip install --upgrade google-api-python-client progressbar2
 ```
 
 Install
@@ -44,9 +44,9 @@ The package includes a default ```client_secrets.json``` file. If you plan to ma
 * Side menu: _APIs & auth_ -> _APIs_
 * Top menu: _Enabled API(s)_: Enable all Youtube APIs.
 * Side menu: _APIs & auth_ -> _Credentials_.
-* _Create new Client ID_: Application type: _Installed application_ + _Other_
-* _Download JSON_: save the file to your local system. 
-* Use the saved JSON as your credentials file: ```--client-secrets=CLIENT_SECRETS```
+* _Create a Client ID_: Add credentials -> OAuth 2.0 Client ID -> Other -> Name: youtube-upload -> Create -> OK
+* _Download JSON_: Under the section "OAuth 2.0 client IDs". Save the file to your local system. 
+* Use this JSON as your credentials file: ```--client-secrets=CLIENT_SECRETS```
 
 Examples
 ========
@@ -66,6 +66,9 @@ $ youtube-upload \
   --description="A.S. Mutter plays Beethoven" \
   --category=Music \
   --tags="mutter, beethoven" \
+  --recording-date="2011-03-10T15:32:17.0Z" \
+  --default-language="en" \
+  --default-audio-language="en" \
   --client-secrets=my_client_secrets.json \
   --credentials-file=my_credentials.json \
   --playlist "My favorite music" \
