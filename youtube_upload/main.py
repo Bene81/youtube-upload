@@ -67,7 +67,6 @@ def get_progress_info():
         bar = progressbar.ProgressBar(widgets=[
             progressbar.Percentage(), ' ',
             progressbar.Bar(), ' ',
-            progressbar.ETA(), ' ',
             progressbar.FileTransferSpeed(),
         ])
         def _callback(total_size, completed):
@@ -245,7 +244,7 @@ def main(arguments):
     try:
         run_main(parser, options, args)
     except googleapiclient.errors.HttpError as error:
-        raise RequestError("Server response: {0}".format(error.content.strip()))
+        raise RequestError("Server response: {0}".format(bytes.decode(error.content).strip()))
 
 def run():
     sys.exit(lib.catch_exceptions(EXIT_CODES, main, sys.argv[1:]))

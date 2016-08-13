@@ -1,3 +1,5 @@
+*NEW: Check my new project [shoogle](https://github.com/tokland/shoogle) for an alternative way of uploading videos to Youtube.*
+
 Introduction
 ============
 
@@ -9,7 +11,7 @@ Dependencies
   * [Python 2.6/2.7/3.x](http://www.python.org).
   * Packages: [google-api-python-client](https://developers.google.com/api-client-library/python), [progressbar2](https://pypi.python.org/pypi/progressbar2) (optional).
 
-Check if your operating system provides those packages, otherwise install them with `pip`:
+Check if your operating system provides those packages (check also those [deb/rpm/mac files](https://github.com/qiuwei/youtube-upload/releases)), otherwise install them with `pip`:
 
 ```
 $ pip install --upgrade google-api-python-client progressbar2
@@ -75,6 +77,13 @@ $ youtube-upload \
   anne_sophie_mutter.flv
 tx2Zb-145Yz
 ```
+*Other extra medata available :* 
+ ```
+ --privacy (public | unlisted | private)  
+ --publish-at (YYYY-MM-DDThh:mm:ss.sZ)  
+ --location (latitude=VAL,longitude=VAL[,altitude=VAL])  
+ --thumbnail (string)  
+ ```
 
 * Upload a video using a browser GUI to authenticate:
 
