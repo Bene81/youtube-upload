@@ -1,5 +1,3 @@
-*NEW: Check my new project [shoogle](https://github.com/tokland/shoogle) for an alternative way of uploading videos to Youtube.*
-
 Introduction
 ============
 
@@ -14,7 +12,7 @@ Dependencies
 Check if your operating system provides those packages (check also those [deb/rpm/mac files](https://github.com/qiuwei/youtube-upload/releases)), otherwise install them with `pip`:
 
 ```
-$ pip install --upgrade google-api-python-client progressbar2
+$ sudo pip install --upgrade google-api-python-client progressbar2
 ```
 
 Install
@@ -111,12 +109,39 @@ $ export https_proxy=$http_proxy
 $ youtube-upload ....
 ```
 
+Get available categories
+========================
+
+* Go to the [API Explorer](https://developers.google.com/apis-explorer)
+- Search "youtube categories" -> *youtube.videoCategories.list*
+- This bring you to [youtube.videoCategories.list service](https://developers.google.com/apis-explorer/#search/youtube%20categories/m/youtube/v3/youtube.videoCategories.list)
+- part: `id,snippet`
+- regionCode: `es` (2 letter code of your country)
+- _Authorize and execute_
+
+And see the JSON response below. Note that categories with the attribute `assignable` equal to `false` cannot be used.
+
+Using `shoogle`:
+
+```
+$ shoogle execute --client-secret-file client_secret.json \
+                  youtube:v3.videoCategories.list <(echo '{"part": "id,snippet", "regionCode": "es"}')  | 
+    jq ".items[] | select(.snippet.assignable) | {id: .id, title: .snippet.title}"
+```
+
 Notes for developers
 ====================
 
 * Main logic of the upload: [main.py](youtube_upload/main.py) (function ```upload_video```).
 * Check the [Youtube Data API](https://developers.google.com/youtube/v3/docs/).
 * Some Youtube API [examples](https://github.com/youtube/api-samples/tree/master/python) provided by Google.
+
+Alternatives
+============
+
+* [shoogle](https://github.com/tokland/shoogle) can send requests to any Google API service, so it can be used not only to upload videos, but also to perform any operation regarding the Youtube API.
+
+* [youtubeuploader](https://github.com/porjo/youtubeuploader) uploads videos to Youtube from local disk or from the web. It also provides rate-limited uploads.
 
 More
 ====
