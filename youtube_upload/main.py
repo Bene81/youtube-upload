@@ -136,7 +136,8 @@ def upload_youtube_video(youtube, options, video_path, total_videos, index):
     debug("Start upload: {0}".format(video_path))
     try:
         video_id = upload_video.upload(youtube, video_path, 
-            request_body, progress_callback=progress.callback)
+            request_body, progress_callback=progress.callback, 
+            chunksize=options.chunksize)
     finally:
         progress.finish()
     return video_id
@@ -203,6 +204,8 @@ def main(arguments):
         help='Video category')
     parser.add_option('-d', '--description', dest='description', type="string",
         help='Video description')
+    parser.add_option('', '--description-file', dest='description_file', type="string", 
+        help='Video description file', default=None)
     parser.add_option('', '--tags', dest='tags', type="string",
         help='Video tags (separated by commas: "tag1, tag2,...")')
     parser.add_option('', '--privacy', dest='privacy', metavar="STRING",
@@ -237,10 +240,17 @@ def main(arguments):
         help='Open a GUI browser to authenticate if required')
 
     #Additional options
+    parser.add_option('', '--chunksize', dest='chunksize', type="int", 
+        default = 1024*1024*8, help='Update file chunksize')
     parser.add_option('', '--open-link', dest='open_link', action='store_true',
         help='Opens a url in a web browser to display the uploaded video')
 
     options, args = parser.parse_args(arguments)
+    
+    if options.description_file is not None and os.path.exists(options.description_file):
+        with open(options.description_file, encoding="utf-8") as file:
+            options.description = file.read()
+
     try:
         run_main(parser, options, args)
     except googleapiclient.errors.HttpError as error:
